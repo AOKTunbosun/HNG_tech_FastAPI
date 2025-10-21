@@ -5,7 +5,7 @@ from sqlalchemy import and_
 from sqlalchemy.orm import Session
 import json
 from datetime import datetime
-from typing import Optional
+
 
 app = FastAPI()
 
@@ -26,11 +26,11 @@ def create_string(request: schemas.String, db: Session = Depends(get_db)):
     query_hash = db.query(models.String).filter(
         models.String.value == value_lower).first()
 
-    if request.value.lower() == '':
+    if value_lower == '':
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail="Invalid request body: Missing 'value' field")
 
-    elif type(request.value) is not str:
+    elif value_lower.isdigit():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                             detail='Invalid data type: "value" must be a string')
 
@@ -79,7 +79,7 @@ def create_string(request: schemas.String, db: Session = Depends(get_db)):
 
 @app.get('/strings', status_code=status.HTTP_200_OK)
 def string_filtering(is_palindrome: bool, min_length: int, max_length: int, word_count: int, contains_character: str, db: Session = Depends(get_db)):
-    if type(is_palindrome) != bool or type(min_length) != int or type(max_length) != int or type(word_count) != int or type(contains_character) != str:
+    if type(is_palindrome) != bool or type(min_length) != int or type(max_length) != int or type(word_count) != int or type(contains_character) != str or contains_character.isdigit():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail='Invalid query parameter values or types')
 
@@ -126,52 +126,64 @@ def natural_language(query: str, db: Session = Depends(get_db)):
         'palindromic strings that contain the first vowel': {'is_palindrome': True, 'contains_character': 'a'},
         'strings containing the letter z': {'contains_character': 'z'}
     }
-    
+
     if query in matching_strings.keys():
         query_filters = matching_strings[query]
 
         if query == 'all single word palindromic strings':
-            word_count = query_filters['word_count'] 
+            word_count = query_filters['word_count']
             is_palindrome = query_filters['is_palindrome']
             strings = db.query(models.String).filter(and_(models.String.is_palindrome == is_palindrome,
-                                                  models.String.word_count == word_count,                                             
-                                                  )).all()
+                                                          models.String.word_count == word_count,
+                                                          )).all()
         elif query == 'strings longer than 10 characters':
             min_length = query_filters['min_length']
-            strings = db.query(models.String).filter(and_(models.String.length >= min_length)).all()
+            strings = db.query(models.String).filter(
+                and_(models.String.length >= min_length)).all()
 
         elif query == 'palindromic strings that contain the first vowel':
             is_palindrome = query_filters['is_palindrome']
             contains_character = query_filters['contains_character']
             strings = db.query(models.String).filter(and_(models.String.is_palindrome == is_palindrome,
-                                                  models.String.value.contains(
-                                                      contains_character)
-                                                  )).all()
+                                                          models.String.value.contains(
+                                                              contains_character)
+                                                          )).all()
 
         elif query == 'strings containing the letter z':
             contains_character = query_filters['contains_character']
-            strings = db.query(models.String).filter(and_(models.String.value.contains(contains_character))).all()
+            strings = db.query(models.String).filter(
+                and_(models.String.value.contains(contains_character))).all()
 
-        return {'data': strings, 
-                'count': len(strings),
+        final_result_list = []
+        for string in strings:
+            final_result_list.append(
+                {'id': string.sha256_hash,
+                 'value': string.value,
+                 'properties': {
+                     'length': string.length,
+                     'is_palindrome': string.is_palindrome,
+                     'unique_characters': string.unique_characters,
+                     'word_count': string.word_count,
+                     'sha256_hash': string.sha256_hash,
+                     'character_frequency_map': json.loads(string.character_freq)
+                 },
+                    'created_at': string.created_at
+                 })
+
+        return {'data': final_result_list,
+                'count': len(final_result_list),
                 'original': query,
                 'parsed_filters': query_filters
                 }
-    
 
     else:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail='Unable to parse natural language query')
 
 
-
-
-
 """
 Any url path which has dynamic routing should be placed under here
 """
-
-
 
 
 @app.get('/strings/{string_value}', status_code=status.HTTP_200_OK)
@@ -195,16 +207,18 @@ def specific_string(string_value, db: Session = Depends(get_db)):
                 },
                 'created_at': string.created_at
                 }
-        
+
 
 @app.delete('/strings/{string_value}', status_code=status.HTTP_204_NO_CONTENT)
 def delete_string(string_value, db: Session = Depends(get_db)):
-    string = db.query(models.String).filter(models.String.value == string_value).first()
+    string = db.query(models.String).filter(
+        models.String.value == string_value).first()
     print(string)
     if string is not None:
-        delete_string = db.query(models.String).filter(models.String.value == string_value).delete(synchronize_session=False)
+        delete_string = db.query(models.String).filter(
+            models.String.value == string_value).delete(synchronize_session=False)
         db.commit()
         return None
     else:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='String does not exist in system')
-    
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail='String does not exist in system')
