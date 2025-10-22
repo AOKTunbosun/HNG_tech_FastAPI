@@ -1,7 +1,7 @@
 from fastapi import FastAPI, status, Depends, HTTPException
 from str_analyzer import schemas, utils, models
 from str_analyzer.database import engine, SessionLocal
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 import json
 from datetime import datetime
@@ -98,6 +98,7 @@ def string_filtering(is_palindrome, min_length, max_length, word_count, contains
     min_length = int(min_length)
     max_length = int(max_length)
     word_count = int(word_count)
+    contains_character = str(contains_character)
 
     strings = db.query(models.String).filter(and_(models.String.is_palindrome == is_palindrome,
                                                   models.String.length >= min_length,
@@ -135,14 +136,17 @@ def string_filtering(is_palindrome, min_length, max_length, word_count, contains
 
 
 @app.get('/strings/filter-by-natural-language', status_code=status.HTTP_200_OK)
-def natural_language(query: str, db: Session = Depends(get_db)):
+def natural_language(query, db: Session = Depends(get_db)):
 
-    # matching_words = {
-    #     'palindromic': {'is_palindrome': True},
-    #     'single': {'word_count': 1},
-    #     'longer than 10': {'min_length': 11},
-    #     'first_vowel': {'contains_character': 'a'}
-    # }
+    if query.isdigit():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail='Unable to parse natural language query')
+    elif not(query):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Missing 'query' parameter")
+
+    query_lower = query.lower().strip()
+
 
     matching_strings = {
         'all single word palindromic strings': {'word_count': 1, 'is_palindrome': True},
@@ -151,21 +155,21 @@ def natural_language(query: str, db: Session = Depends(get_db)):
         'strings containing the letter z': {'contains_character': 'z'}
     }
 
-    if query in matching_strings.keys():
-        query_filters = matching_strings[query]
+    if query_lower in matching_strings.keys():
+        query_filters = matching_strings[query_lower]
 
-        if query == 'all single word palindromic strings':
+        if query_lower == 'all single word palindromic strings':
             word_count = query_filters['word_count']
             is_palindrome = query_filters['is_palindrome']
             strings = db.query(models.String).filter(and_(models.String.is_palindrome == is_palindrome,
                                                           models.String.word_count == word_count,
                                                           )).all()
-        elif query == 'strings longer than 10 characters':
+        elif query_lower == 'strings longer than 10 characters':
             min_length = query_filters['min_length']
             strings = db.query(models.String).filter(
                 and_(models.String.length >= min_length)).all()
 
-        elif query == 'palindromic strings that contain the first vowel':
+        elif query_lower == 'palindromic strings that contain the first vowel':
             is_palindrome = query_filters['is_palindrome']
             contains_character = query_filters['contains_character']
             strings = db.query(models.String).filter(and_(models.String.is_palindrome == is_palindrome,
@@ -173,7 +177,7 @@ def natural_language(query: str, db: Session = Depends(get_db)):
                                                               contains_character)
                                                           )).all()
 
-        elif query == 'strings containing the letter z':
+        elif query_lower == 'strings containing the letter z':
             contains_character = query_filters['contains_character']
             strings = db.query(models.String).filter(
                 and_(models.String.value.contains(contains_character))).all()
@@ -196,8 +200,9 @@ def natural_language(query: str, db: Session = Depends(get_db)):
 
         return {'data': final_result_list,
                 'count': len(final_result_list),
+                'interpreted_query':{
                 'original': query,
-                'parsed_filters': query_filters
+                'parsed_filters': query_filters}
                 }
 
     else:
