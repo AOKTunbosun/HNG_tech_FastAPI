@@ -136,6 +136,14 @@ def string_filtering(is_palindrome, min_length, max_length, word_count, contains
 
 @app.get('/strings/filter-by-natural-language', status_code=status.HTTP_200_OK)
 def natural_language(query: str, db: Session = Depends(get_db)):
+
+    # matching_words = {
+    #     'palindromic': {'is_palindrome': True},
+    #     'single': {'word_count': 1},
+    #     'longer than 10': {'min_length': 11},
+    #     'first_vowel': {'contains_character': 'a'}
+    # }
+
     matching_strings = {
         'all single word palindromic strings': {'word_count': 1, 'is_palindrome': True},
         'strings longer than 10 characters': {'min_length': 11},
