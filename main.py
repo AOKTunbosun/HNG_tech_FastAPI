@@ -85,10 +85,10 @@ def string_filtering(is_palindrome, min_length, max_length, word_count, contains
                             detail='Invalid query parameter values or types')
     
     elif type(is_palindrome) == str:
-        if is_palindrome =='true':
+        if is_palindrome.lower() =='true':
             is_palindrome = True
         
-        elif is_palindrome == 'false':
+        elif is_palindrome.lower() == 'false':
             is_palindrome = False
         
         else:
