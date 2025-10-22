@@ -32,7 +32,7 @@ def create_string(request: schemas.String, db: Session = Depends(get_db)):
 
     elif value_lower.isdigit():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                            detail='Invalid data type: "value" must be a string')
+                            detail="Invalid data type: 'value' must be a string")
 
     else:
         if query_hash is not None:
