@@ -78,10 +78,15 @@ def create_string(request: schemas.String, db: Session = Depends(get_db)):
 
 
 @app.get('/strings', status_code=status.HTTP_200_OK)
-def string_filtering(is_palindrome: bool, min_length: int, max_length: int, word_count: int, contains_character: str, db: Session = Depends(get_db)):
-    if type(is_palindrome) != bool or type(min_length) != int or type(max_length) != int or type(word_count) != int or type(contains_character) != str or contains_character.isdigit():
+def string_filtering(is_palindrome: bool, min_length, max_length, word_count, contains_character, db: Session = Depends(get_db)):
+   
+    if type(is_palindrome) != bool or not(min_length.isdigit()) or not(max_length.isdigit()) or not(word_count.isdigit()) or type(contains_character) != str or contains_character.isdigit():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
                             detail='Invalid query parameter values or types')
+    
+    min_length = int(min_length)
+    max_length = int(max_length)
+    word_count = int(word_count)
 
     strings = db.query(models.String).filter(and_(models.String.is_palindrome == is_palindrome,
                                                   models.String.length >= min_length,
